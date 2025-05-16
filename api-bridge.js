@@ -7,12 +7,18 @@
     let bridgeSocket = null;
     let bridgeConnected = false;
     let statusPollingIntervals = {};
+    let currentProxyIndex = 0;
     
     // Constants
     const SONAUTO_API_BASE = 'https://api.sonauto.ai/v1';
     const CORS_PROXIES = [
         '', // Direct connection first
+        'https://corsproxy.io/?',
         'https://cors-anywhere.herokuapp.com/',
+        'https://api.codetabs.com/v1/proxy?quest=',
+        'https://cors-proxy.fringe.zone/',
+        'https://cors.sh/',
+        'https://proxy.cors.sh/',
         'https://api.allorigins.win/raw?url='
     ];
     
@@ -142,6 +148,54 @@
         }
     }
     
+    // Improve fetch function to handle CORS issues
+    async function corsAwareFetch(url, options) {
+        // Try each proxy in sequence
+        for (let i = 0; i < CORS_PROXIES.length; i++) {
+            try {
+                const proxyIndex = (currentProxyIndex + i) % CORS_PROXIES.length;
+                const proxy = CORS_PROXIES[proxyIndex];
+                const proxyUrl = proxy + url;
+                
+                // Update UI if possible
+                if (window.updateStatusProgress) {
+                    window.updateStatusProgress(`TRYING_CORS_PROXY_${proxyIndex + 1}`, 5);
+                }
+                
+                console.log(`Trying proxy ${proxyIndex}: ${proxy}`);
+                
+                // Special handling for proxies that don't support custom headers
+                let fetchOptions = {...options};
+                if (proxy && proxy.includes('allorigins') || proxy.includes('codetabs')) {
+                    // For these proxies, we need to embed the API key in the URL
+                    const separator = url.includes('?') ? '&' : '?';
+                    const authUrl = `${url}${separator}api_key=${apiKey}`;
+                    fetchOptions.headers = {...fetchOptions.headers};
+                    delete fetchOptions.headers['Authorization'];
+                    return fetch(proxy + authUrl, fetchOptions);
+                }
+                
+                const response = await fetch(proxyUrl, options);
+                
+                // If successful, update the current proxy index for next time
+                if (response.ok) {
+                    currentProxyIndex = proxyIndex;
+                    return response;
+                }
+                
+                throw new Error(`HTTP error: ${response.status}`);
+            } catch (error) {
+                console.error(`Error with proxy ${i}:`, error);
+                
+                // If we've tried all proxies, throw the error
+                if (i === CORS_PROXIES.length - 1) {
+                    throw new Error(`All proxies failed: ${error.message}`);
+                }
+                // Otherwise, try the next proxy
+            }
+        }
+    }
+    
     // Direct API connection
     async function generateMusicViaApi(params, onSuccess, onError) {
         try {
@@ -151,36 +205,49 @@
             const apiParams = { ...params };
             delete apiParams.generationType;
             
-            // Try making the request with different CORS proxies
-            for (let i = 0; i < CORS_PROXIES.length; i++) {
-                try {
-                    const proxyUrl = CORS_PROXIES[i] + endpoint;
-                    
-                    const response = await fetch(proxyUrl, {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${apiKey}`,
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify(apiParams)
-                    });
-                    
-                    if (!response.ok) {
-                        const errorData = await response.json();
-                        throw new Error(errorData.error || `HTTP error: ${response.status}`);
-                    }
-                    
-                    const data = await response.json();
-                    onSuccess(data.task_id);
-                    return;
-                } catch (proxyError) {
-                    console.error(`Error with proxy ${i}:`, proxyError);
-                    
-                    // Try next proxy if available
-                    if (i === CORS_PROXIES.length - 1) {
-                        throw proxyError; // All proxies failed
-                    }
+            // Show the user that we're trying to connect
+            if (window.updateStatusProgress) {
+                window.updateStatusProgress('TRYING_DIRECT_API', 5);
+            }
+            
+            // Try with our enhanced fetch function
+            try {
+                const response = await corsAwareFetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${apiKey}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(apiParams)
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || `HTTP error: ${response.status}`);
                 }
+                
+                const data = await response.json();
+                onSuccess(data.task_id);
+                return;
+            } catch (error) {
+                // If all proxies failed, try one more fallback approach
+                if (error.message.includes('All proxies failed')) {
+                    // Try a last resort approach - JSON-P style embedding using an iframe for GET requests
+                    // This won't work for POST, but worth showing the fallback process
+                    if (window.showAlert) {
+                        window.showAlert('All CORS proxies failed. Please consider using the Local Bridge option.', 'warning');
+                        
+                        // Auto-switch to local bridge UI if it exists
+                        const localBridgeRadio = document.getElementById('localBridge');
+                        if (localBridgeRadio) {
+                            localBridgeRadio.checked = true;
+                            const event = new Event('change');
+                            localBridgeRadio.dispatchEvent(event);
+                        }
+                    }
+                    throw error;
+                }
+                throw error;
             }
         } catch (error) {
             console.error('Error generating music:', error);
@@ -220,44 +287,36 @@
         // Function to check status
         async function checkStatus() {
             try {
-                // Try different CORS proxies
-                for (let i = 0; i < CORS_PROXIES.length; i++) {
-                    try {
-                        const proxyUrl = CORS_PROXIES[i] + `${SONAUTO_API_BASE}/generations/status/${taskId}`;
-                        
-                        const response = await fetch(proxyUrl, {
-                            method: 'GET',
-                            headers: {
-                                'Authorization': `Bearer ${apiKey}`
-                            }
-                        });
-                        
-                        if (!response.ok) {
-                            const errorData = await response.json();
-                            throw new Error(errorData.error || `HTTP error: ${response.status}`);
+                const statusUrl = `${SONAUTO_API_BASE}/generations/status/${taskId}`;
+                
+                try {
+                    const response = await corsAwareFetch(statusUrl, {
+                        method: 'GET',
+                        headers: {
+                            'Authorization': `Bearer ${apiKey}`
                         }
-                        
-                        // API returns status as a quoted string
-                        const statusText = await response.text();
-                        const status = statusText.replace(/"/g, '');
-                        
-                        onStatus(status);
-                        
-                        // If status is terminal, stop polling
-                        if (status === 'SUCCESS' || status === 'FAILURE') {
-                            clearInterval(statusPollingIntervals[taskId]);
-                            delete statusPollingIntervals[taskId];
-                        }
-                        
-                        return;
-                    } catch (proxyError) {
-                        console.error(`Error with status proxy ${i}:`, proxyError);
-                        
-                        // Try next proxy if available
-                        if (i === CORS_PROXIES.length - 1) {
-                            throw proxyError; // All proxies failed
-                        }
+                    });
+                    
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.error || `HTTP error: ${response.status}`);
                     }
+                    
+                    // API returns status as a quoted string
+                    const statusText = await response.text();
+                    const status = statusText.replace(/"/g, '');
+                    
+                    onStatus(status);
+                    
+                    // If status is terminal, stop polling
+                    if (status === 'SUCCESS' || status === 'FAILURE') {
+                        clearInterval(statusPollingIntervals[taskId]);
+                        delete statusPollingIntervals[taskId];
+                    }
+                    
+                    return;
+                } catch (error) {
+                    throw error;
                 }
             } catch (error) {
                 console.error('Error checking status:', error);
@@ -296,33 +355,26 @@
             }
             
             // Otherwise use direct API
-            for (let i = 0; i < CORS_PROXIES.length; i++) {
-                try {
-                    const proxyUrl = CORS_PROXIES[i] + `${SONAUTO_API_BASE}/generations/${taskId}`;
-                    
-                    const response = await fetch(proxyUrl, {
-                        method: 'GET',
-                        headers: {
-                            'Authorization': `Bearer ${apiKey}`
-                        }
-                    });
-                    
-                    if (!response.ok) {
-                        const errorData = await response.json();
-                        throw new Error(errorData.error || `HTTP error: ${response.status}`);
+            const resultUrl = `${SONAUTO_API_BASE}/generations/${taskId}`;
+            
+            try {
+                const response = await corsAwareFetch(resultUrl, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${apiKey}`
                     }
-                    
-                    const data = await response.json();
-                    onResult(data);
-                    return;
-                } catch (proxyError) {
-                    console.error(`Error with result proxy ${i}:`, proxyError);
-                    
-                    // Try next proxy if available
-                    if (i === CORS_PROXIES.length - 1) {
-                        throw proxyError; // All proxies failed
-                    }
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || `HTTP error: ${response.status}`);
                 }
+                
+                const data = await response.json();
+                onResult(data);
+                return;
+            } catch (error) {
+                throw error;
             }
         } catch (error) {
             console.error('Error getting result:', error);
@@ -347,4 +399,3 @@
     // Make initializeApiBridge globally available
     window.initializeApiBridge = initializeApiBridge;
 })();
-

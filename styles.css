@@ -338,20 +338,28 @@ main {
     }
 }
 
-/* Animation */
+.recommended-option {
+    box-shadow: 0 0 10px var(--primary-color);
+    border-color: var(--primary-color) !important;
+    background-color: rgba(98, 0, 234, 0.1) !important;
+    font-weight: bold !important;
+}
+
 @keyframes pulse {
     0% {
         transform: scale(1);
+        opacity: 1;
     }
     50% {
         transform: scale(1.05);
+        opacity: 0.8;
     }
     100% {
         transform: scale(1);
+        opacity: 1;
     }
 }
 
 .pulse {
     animation: pulse 2s infinite;
 }
-
