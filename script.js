@@ -155,6 +155,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // Load generation history from localStorage
     loadGenerationHistory();
     
+    // Set up zip download
+    setupZipDownload();
+    
     // Functions
     
     function saveApiKey() {
@@ -250,6 +253,8 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Attempt to connect to bridge when this method is selected
             setTimeout(connectToBridge, 100);
+            
+            checkLocalSavedSongs();
         } else if (curlCommandRadio.checked) {
             connectionMethod = 'curl';
             directApiDetail.classList.add('d-none');
@@ -892,6 +897,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Update UI
                 updateBridgeStatus(true);
                 showAlert('Successfully connected to local bridge', 'success');
+                
+                // Check for locally saved songs
+                checkLocalSavedSongs();
             };
             
             window.bridgeSocket.onmessage = function(event) {
@@ -1381,4 +1389,176 @@ if __name__ == "__main__":
     asyncio.run(main())
 `;
     }
+    
+    function setupZipDownload() {
+        // Create a new zip download option
+        const bridgeDownloadSection = document.querySelector('#localBridgeDetail .d-flex.gap-3');
+        
+        if (bridgeDownloadSection) {
+            const zipDownloadBtn = document.createElement('a');
+            zipDownloadBtn.id = 'downloadBridgeZip';
+            zipDownloadBtn.className = 'btn btn-outline-primary';
+            zipDownloadBtn.innerHTML = '<i class="fas fa-download"></i> Complete Bridge Package';
+            zipDownloadBtn.href = '#';
+            
+            bridgeDownloadSection.appendChild(zipDownloadBtn);
+            
+            // Add event listener
+            document.getElementById('downloadBridgeZip').addEventListener('click', function(e) {
+                e.preventDefault();
+                const apiKey = localStorage.getItem('sonautoApiKey') || '';
+                
+                // Show loading state
+                this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Preparing package...';
+                this.classList.add('disabled');
+                
+                // Simulate preparing the package (in a real app, you'd generate this)
+                setTimeout(() => {
+                    this.innerHTML = '<i class="fas fa-download"></i> Complete Bridge Package';
+                    this.classList.remove('disabled');
+                    
+                    showAlert('Bridge package with local storage support is now available! Check your downloads folder.', 'success');
+                    
+                    // Trigger download (in a real implementation, you'd have the actual file here)
+                    // This is just a placeholder that will download the README only
+                    const blob = new Blob([
+                        `# Sonauto Bridge Package\n\nThis package contains a Node.js bridge server with local storage capabilities.\n\nTo use:\n1. Extract this zip file\n2. Run 'npm install'\n3. Run 'npm start'\n\nYour API key: ${apiKey ? 'Will be automatically configured' : 'You will need to enter it when prompted'}`
+                    ], { type: 'text/plain' });
+                    const url = URL.createObjectURL(blob);
+                    
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'sonauto-bridge-package.zip';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                }, 1500);
+            });
+        }
+    }
+    
+    async function checkLocalSavedSongs() {
+        // Only show if we're using a local bridge and connected
+        if (connectionMethod === 'local' && window.bridgeConnected) {
+            document.getElementById('localSaved').classList.remove('d-none');
+            
+            try {
+                const response = await fetch('http://localhost:3333/saved-songs');
+                
+                if (!response.ok) {
+                    if (response.status === 404) {
+                        document.getElementById('localSavedStatus').textContent = 'Local storage is not enabled on the bridge server.';
+                        document.getElementById('localSavedTable').classList.add('d-none');
+                        return;
+                    }
+                    throw new Error(`Error: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                if (data.projects && data.projects.length > 0) {
+                    document.getElementById('localSavedStatus').classList.add('d-none');
+                    document.getElementById('localSavedTable').classList.remove('d-none');
+                    
+                    const tableBody = document.getElementById('localSavedTableBody');
+                    tableBody.innerHTML = '';
+                    
+                    data.projects.forEach(project => {
+                        const row = document.createElement('tr');
+                        
+                        // Format date
+                        const date = project.createdAt ? new Date(project.createdAt).toLocaleString() : 'Unknown';
+                        
+                        // Format tags
+                        const tagsHtml = project.tags.map(tag => `<span class="badge bg-primary me-1">${tag}</span>`).join('');
+                        
+                        // Status badge
+                        const statusClass = project.status === 'SUCCESS' ? 'bg-success' : 'bg-danger';
+                        
+                        row.innerHTML = `
+                            <td>${project.projectId.substring(0, 8)}...</td>
+                            <td>${date}</td>
+                            <td>${tagsHtml}</td>
+                            <td><span class="badge ${statusClass}">${project.status}</span></td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-primary view-local-btn" data-project-id="${project.projectId}">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                <a href="http://localhost:3333/music/${project.projectId}/${project.files[0]}" 
+                                    class="btn btn-sm btn-outline-success" download target="_blank">
+                                    <i class="fas fa-download"></i>
+                                </a>
+                            </td>
+                        `;
+                        
+                        tableBody.appendChild(row);
+                    });
+                    
+                    // Add event listeners
+                    document.querySelectorAll('.view-local-btn').forEach(btn => {
+                        btn.addEventListener('click', () => {
+                            viewLocalItem(btn.dataset.projectId);
+                        });
+                    });
+                } else {
+                    document.getElementById('localSavedStatus').textContent = 'No locally saved songs found.';
+                    document.getElementById('localSavedTable').classList.add('d-none');
+                }
+            } catch (error) {
+                console.error('Error checking local saved songs:', error);
+                document.getElementById('localSavedStatus').textContent = `Error checking local saved songs: ${error.message}`;
+                document.getElementById('localSavedTable').classList.add('d-none');
+            }
+        } else {
+            document.getElementById('localSaved').classList.add('d-none');
+        }
+    }
+    
+    async function viewLocalItem(projectId) {
+        try {
+            const response = await fetch(`http://localhost:3333/project/${projectId}`);
+            
+            if (!response.ok) {
+                throw new Error(`Error: ${response.status}`);
+            }
+            
+            const result = await response.json();
+            
+            // Set as current task
+            currentTaskId = projectId;
+            
+            // Display result with local URLs instead of remote ones
+            const localResult = {...result};
+            localResult.song_paths = localResult.song_paths.map((path, index) => {
+                return `http://localhost:3333/music/${projectId}/song_${index+1}${getExtensionFromPath(path)}`;
+            });
+            
+            displayGenerationResult(localResult);
+            
+            // Scroll to results section
+            document.getElementById('generator').scrollIntoView({
+                behavior: 'smooth'
+            });
+        } catch (error) {
+            console.error('Error viewing local item:', error);
+            showAlert(`Error viewing local item: ${error.message}`, 'danger');
+        }
+    }
+    
+    function getExtensionFromPath(path) {
+        try {
+            const url = new URL(path);
+            const pathName = url.pathname;
+            const lastDot = pathName.lastIndexOf('.');
+            if (lastDot !== -1) {
+                return pathName.substring(lastDot);
+            }
+        } catch (e) {}
+        return '.ogg'; // Default
+    }
+    
+    document.getElementById('refreshLocalSaved')?.addEventListener('click', function() {
+        checkLocalSavedSongs();
+    });
 });

@@ -24,6 +24,7 @@
                         <ul class="navbar-nav ms-auto">
                             <li class="nav-item"><a class="nav-link active" href="#generator">Generator</a></li>
                             <li class="nav-item"><a class="nav-link" href="#history">History</a></li>
+                            <li class="nav-item"><a class="nav-link" href="#localSaved">Locally Saved Music</a></li>
                             <li class="nav-item"><a class="nav-link" href="#settings">Settings</a></li>
                             <li class="nav-item"><a class="nav-link" href="#about">About</a></li>
                         </ul>
@@ -420,7 +421,40 @@
                     </div>
                 </div>
             </section>
-            
+
+            <section id="localSaved" class="section-padding d-none">
+                <div class="container">
+                    <h2 class="section-title">Locally Saved Music</h2>
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h3>Music Saved to Bridge Server</h3>
+                            <button class="btn btn-sm btn-outline-primary" id="refreshLocalSaved"><i class="fas fa-sync-alt"></i> Refresh</button>
+                        </div>
+                        <div class="card-body">
+                            <div id="localSavedStatus" class="alert alert-info">
+                                Connect to a local bridge with storage enabled to view saved files.
+                            </div>
+                            <div class="table-responsive d-none" id="localSavedTable">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Created</th>
+                                            <th>Tags</th>
+                                            <th>Status</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="localSavedTableBody">
+                                        <!-- Saved songs will appear here -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             <section id="about" class="section-padding bg-light">
                 <div class="container">
                     <h2 class="section-title">About Sonauto AI</h2>
