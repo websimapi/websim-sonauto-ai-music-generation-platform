@@ -117,8 +117,33 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('getStartedBtn').addEventListener('click', scrollToGenerator);
     
     // Downloads for bridge files
-    downloadNodeBridge.addEventListener('click', downloadNodeJsBridge);
-    downloadPythonBridge.addEventListener('click', downloadPythonBridge);
+    downloadNodeBridge.addEventListener('click', function() {
+        const bridgeContent = generateNodeJsBridgeContent();
+        const blob = new Blob([bridgeContent], { type: 'text/javascript' });
+        const url = URL.createObjectURL(blob);
+        
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'sonauto-bridge.js';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    });
+    
+    downloadPythonBridge.addEventListener('click', function() {
+        const bridgeContent = generatePythonBridgeContent();
+        const blob = new Blob([bridgeContent], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'sonauto-bridge.py';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    });
     
     // Copy cURL command
     copyCurlCommand.addEventListener('click', copyCurlCommandToClipboard);
@@ -340,430 +365,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 showAlert('Failed to copy command.', 'danger');
             }
         );
-    }
-    
-    function downloadNodeJsBridge() {
-        const bridgeContent = generateNodeJsBridgeContent();
-        const blob = new Blob([bridgeContent], { type: 'text/javascript' });
-        const url = URL.createObjectURL(blob);
-        
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'sonauto-bridge.js';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    }
-    
-    function downloadPythonBridge() {
-        const bridgeContent = generatePythonBridgeContent();
-        const blob = new Blob([bridgeContent], { type: 'text/plain' });
-        const url = URL.createObjectURL(blob);
-        
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'sonauto-bridge.py';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    }
-    
-    function generateNodeJsBridgeContent() {
-        return `
-const express = require('express');
-const cors = require('cors');
-const WebSocket = require('ws');
-const axios = require('axios');
-const app = express();
-const port = 3333;
-
-// Your Sonauto API key - replace with yours or use env variables
-const API_KEY = '${apiKey || 'YOUR_API_KEY_HERE'}';
-const SONAUTO_API_BASE = 'https://api.sonauto.ai/v1';
-
-app.use(cors());
-app.use(express.json({limit: '50mb'}));
-
-// Create WebSocket server
-const wss = new WebSocket.Server({ port: 3334 });
-
-// Store connected clients
-const clients = new Set();
-
-// WebSocket connection handler
-wss.on('connection', (ws) => {
-    console.log('Client connected');
-    clients.add(ws);
-    
-    ws.on('message', async (message) => {
-        try {
-            const data = JSON.parse(message);
-            console.log('Received request:', data.action);
-            
-            if (data.action === 'generate') {
-                const response = await generateMusic(data.params, ws);
-                ws.send(JSON.stringify({
-                    type: 'generation_started',
-                    taskId: response.task_id
-                }));
-            } else if (data.action === 'status') {
-                const response = await checkStatus(data.taskId);
-                ws.send(JSON.stringify({
-                    type: 'status_update',
-                    status: response,
-                    taskId: data.taskId
-                }));
-            } else if (data.action === 'result') {
-                const response = await getResult(data.taskId);
-                ws.send(JSON.stringify({
-                    type: 'generation_result',
-                    result: response,
-                    taskId: data.taskId
-                }));
-            }
-        } catch (error) {
-            console.error('Error processing message:', error);
-            ws.send(JSON.stringify({
-                type: 'error',
-                message: error.message
-            }));
-        }
-    });
-    
-    ws.on('close', () => {
-        console.log('Client disconnected');
-        clients.delete(ws);
-    });
-    
-    // Send initial connection confirmation
-    ws.send(JSON.stringify({
-        type: 'connected',
-        message: 'Connected to Sonauto bridge server'
-    }));
-});
-
-// API Functions
-async function generateMusic(params, ws) {
-    const endpoint = getEndpointForType(params.generationType);
-    
-    try {
-        const response = await axios.post(endpoint, params, {
-            headers: {
-                'Authorization': \`Bearer \${API_KEY}\`,
-                'Content-Type': 'application/json'
-            }
-        });
-        
-        // Start polling status
-        const taskId = response.data.task_id;
-        pollStatus(taskId, ws);
-        
-        return response.data;
-    } catch (error) {
-        console.error('Error generating music:', error.response?.data || error.message);
-        throw new Error(error.response?.data?.error || 'Failed to generate music');
-    }
-}
-
-async function checkStatus(taskId) {
-    try {
-        const response = await axios.get(\`\${SONAUTO_API_BASE}/generations/status/\${taskId}\`, {
-            headers: {
-                'Authorization': \`Bearer \${API_KEY}\`
-            }
-        });
-        return response.data;
-    } catch (error) {
-        console.error('Error checking status:', error.response?.data || error.message);
-        throw new Error(error.response?.data?.error || 'Failed to check status');
-    }
-}
-
-async function getResult(taskId) {
-    try {
-        const response = await axios.get(\`\${SONAUTO_API_BASE}/generations/\${taskId}\`, {
-            headers: {
-                'Authorization': \`Bearer \${API_KEY}\`
-            }
-        });
-        return response.data;
-    } catch (error) {
-        console.error('Error getting result:', error.response?.data || error.message);
-        throw new Error(error.response?.data?.error || 'Failed to get result');
-    }
-}
-
-function getEndpointForType(type) {
-    switch (type) {
-        case 'new':
-            return \`\${SONAUTO_API_BASE}/generations\`;
-        case 'extend':
-            return \`\${SONAUTO_API_BASE}/generations/extend\`;
-        case 'inpaint':
-            return \`\${SONAUTO_API_BASE}/generations/inpaint\`;
-        default:
-            return \`\${SONAUTO_API_BASE}/generations\`;
-    }
-}
-
-// Poll status and send updates to client
-async function pollStatus(taskId, ws) {
-    let interval;
-    let completed = false;
-    
-    interval = setInterval(async () => {
-        try {
-            const status = await checkStatus(taskId);
-            
-            // Send status update to client
-            ws.send(JSON.stringify({
-                type: 'status_update',
-                status: status,
-                taskId: taskId
-            }));
-            
-            // Check if generation is complete
-            if (status === 'SUCCESS' || status === 'FAILURE') {
-                completed = true;
-                clearInterval(interval);
-                
-                // If success, fetch the full result
-                if (status === 'SUCCESS') {
-                    const result = await getResult(taskId);
-                    ws.send(JSON.stringify({
-                        type: 'generation_result',
-                        result: result,
-                        taskId: taskId
-                    }));
-                }
-            }
-        } catch (error) {
-            console.error('Error polling status:', error);
-            ws.send(JSON.stringify({
-                type: 'error',
-                message: error.message,
-                taskId: taskId
-            }));
-            
-            clearInterval(interval);
-        }
-    }, 2000); // Poll every 2 seconds
-    
-    // Clear interval after 30 minutes to prevent infinite polling
-    setTimeout(() => {
-        if (!completed && interval) {
-            clearInterval(interval);
-            ws.send(JSON.stringify({
-                type: 'error',
-                message: 'Status polling timed out after 30 minutes',
-                taskId: taskId
-            }));
-        }
-    }, 30 * 60 * 1000);
-}
-
-app.listen(port, () => {
-    console.log(\`Sonauto Bridge Server running at http://localhost:\${port}\`);
-    console.log(\`WebSocket server running at ws://localhost:3334\`);
-});
-`;
-    }
-    
-    function generatePythonBridgeContent() {
-        return `
-import json
-import asyncio
-import websockets
-import requests
-import time
-from threading import Thread
-
-# Your Sonauto API key - replace with yours or use env variables
-API_KEY = "${apiKey || 'YOUR_API_KEY_HERE'}"
-SONAUTO_API_BASE = "https://api.sonauto.ai/v1"
-
-# Store active tasks for polling
-active_tasks = {}
-
-# API Functions
-def generate_music(params):
-    endpoint = get_endpoint_for_type(params.get('generationType', 'new'))
-    
-    headers = {
-        'Authorization': f'Bearer {API_KEY}',
-        'Content-Type': 'application/json'
-    }
-    
-    try:
-        response = requests.post(endpoint, json=params, headers=headers)
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        print(f"Error generating music: {str(e)}")
-        if hasattr(e, 'response') and e.response:
-            error_msg = e.response.json().get('error', 'Failed to generate music')
-        else:
-            error_msg = 'Failed to generate music'
-        raise Exception(error_msg)
-
-def check_status(task_id):
-    headers = {
-        'Authorization': f'Bearer {API_KEY}'
-    }
-    
-    try:
-        response = requests.get(f"{SONAUTO_API_BASE}/generations/status/{task_id}", headers=headers)
-        response.raise_for_status()
-        return response.text.strip('"')  # API returns status as a quoted string
-    except requests.exceptions.RequestException as e:
-        print(f"Error checking status: {str(e)}")
-        if hasattr(e, 'response') and e.response:
-            error_msg = e.response.json().get('error', 'Failed to check status')
-        else:
-            error_msg = 'Failed to check status'
-        raise Exception(error_msg)
-
-def get_result(task_id):
-    headers = {
-        'Authorization': f'Bearer {API_KEY}'
-    }
-    
-    try:
-        response = requests.get(f"{SONAUTO_API_BASE}/generations/{task_id}", headers=headers)
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        print(f"Error getting result: {str(e)}")
-        if hasattr(e, 'response') and e.response:
-            error_msg = e.response.json().get('error', 'Failed to get result')
-        else:
-            error_msg = 'Failed to get result'
-        raise Exception(error_msg)
-
-def get_endpoint_for_type(generation_type):
-    if generation_type == 'new':
-        return f"{SONAUTO_API_BASE}/generations"
-    elif generation_type == 'extend':
-        return f"{SONAUTO_API_BASE}/generations/extend"
-    elif generation_type == 'inpaint':
-        return f"{SONAUTO_API_BASE}/generations/inpaint"
-    else:
-        return f"{SONAUTO_API_BASE}/generations"
-
-# Poll status and send updates
-def poll_status(task_id, websocket):
-    completed = False
-    
-    while not completed:
-        try:
-            status = check_status(task_id)
-            
-            # Send status update
-            asyncio.run(send_message(websocket, {
-                'type': 'status_update',
-                'status': status,
-                'taskId': task_id
-            }))
-            
-            # Check if generation is complete
-            if status == 'SUCCESS' or status == 'FAILURE':
-                completed = True
-                
-                # If success, fetch the full result
-                if status == 'SUCCESS':
-                    result = get_result(task_id)
-                    asyncio.run(send_message(websocket, {
-                        'type': 'generation_result',
-                        'result': result,
-                        'taskId': task_id
-                    }))
-                    
-            # Wait before polling again
-            time.sleep(2)
-            
-        except Exception as e:
-            print(f"Error polling status: {str(e)}")
-            asyncio.run(send_message(websocket, {
-                'type': 'error',
-                'message': str(e),
-                'taskId': task_id
-            }))
-            completed = True
-
-async def send_message(websocket, message):
-    try:
-        await websocket.send(json.dumps(message))
-    except Exception as e:
-        print(f"Error sending message: {str(e)}")
-
-# WebSocket server handler
-async def sonauto_bridge(websocket, path):
-    print("Client connected")
-    
-    # Send connection confirmation
-    await websocket.send(json.dumps({
-        'type': 'connected',
-        'message': 'Connected to Sonauto bridge server'
-    }))
-    
-    try:
-        async for message in websocket:
-            try:
-                data = json.loads(message)
-                print(f"Received request: {data.get('action')}")
-                
-                if data.get('action') == 'generate':
-                    response = generate_music(data.get('params', {}))
-                    await websocket.send(json.dumps({
-                        'type': 'generation_started',
-                        'taskId': response.get('task_id')
-                    }))
-                    
-                    # Start status polling in a separate thread
-                    task_id = response.get('task_id')
-                    active_tasks[task_id] = Thread(target=poll_status, args=(task_id, websocket))
-                    active_tasks[task_id].start()
-                    
-                elif data.get('action') == 'status':
-                    task_id = data.get('taskId')
-                    status = check_status(task_id)
-                    await websocket.send(json.dumps({
-                        'type': 'status_update',
-                        'status': status,
-                        'taskId': task_id
-                    }))
-                    
-                elif data.get('action') == 'result':
-                    task_id = data.get('taskId')
-                    result = get_result(task_id)
-                    await websocket.send(json.dumps({
-                        'type': 'generation_result',
-                        'result': result,
-                        'taskId': task_id
-                    }))
-                    
-            except Exception as e:
-                print(f"Error processing message: {str(e)}")
-                await websocket.send(json.dumps({
-                    'type': 'error',
-                    'message': str(e)
-                }))
-                
-    except websockets.exceptions.ConnectionClosed:
-        print("Client disconnected")
-
-async def main():
-    print("Starting Sonauto Bridge Server...")
-    print("WebSocket server running at ws://localhost:3334")
-    
-    async with websockets.serve(sonauto_bridge, "localhost", 3334):
-        await asyncio.Future()  # Run forever
-
-if __name__ == "__main__":
-    asyncio.run(main())
-`;
     }
     
     function generateMusic() {
@@ -1303,5 +904,400 @@ if __name__ == "__main__":
     
     // Run initialization
     initUI();
+    
+    function generateNodeJsBridgeContent() {
+        return `
+const express = require('express');
+const cors = require('cors');
+const WebSocket = require('ws');
+const axios = require('axios');
+const app = express();
+const port = 3333;
+
+// Your Sonauto API key - replace with yours or use env variables
+const API_KEY = '${apiKey || 'YOUR_API_KEY_HERE'}';
+const SONAUTO_API_BASE = 'https://api.sonauto.ai/v1';
+
+app.use(cors());
+app.use(express.json({limit: '50mb'}));
+
+// Create WebSocket server
+const wss = new WebSocket.Server({ port: 3334 });
+
+// Store connected clients
+const clients = new Set();
+
+// WebSocket connection handler
+wss.on('connection', (ws) => {
+    console.log('Client connected');
+    clients.add(ws);
+    
+    ws.on('message', async (message) => {
+        try {
+            const data = JSON.parse(message);
+            console.log('Received request:', data.action);
+            
+            if (data.action === 'generate') {
+                const response = await generateMusic(data.params, ws);
+                ws.send(JSON.stringify({
+                    type: 'generation_started',
+                    taskId: response.task_id
+                }));
+            } else if (data.action === 'status') {
+                const response = await checkStatus(data.taskId);
+                ws.send(JSON.stringify({
+                    type: 'status_update',
+                    status: response,
+                    taskId: data.taskId
+                }));
+            } else if (data.action === 'result') {
+                const response = await getResult(data.taskId);
+                ws.send(JSON.stringify({
+                    type: 'generation_result',
+                    result: response,
+                    taskId: data.taskId
+                }));
+            }
+        } catch (error) {
+            console.error('Error processing message:', error);
+            ws.send(JSON.stringify({
+                type: 'error',
+                message: error.message
+            }));
+        }
+    });
+    
+    ws.on('close', () => {
+        console.log('Client disconnected');
+        clients.delete(ws);
+    });
+    
+    // Send initial connection confirmation
+    ws.send(JSON.stringify({
+        type: 'connected',
+        message: 'Connected to Sonauto bridge server'
+    }));
 });
 
+// API Functions
+async function generateMusic(params, ws) {
+    const endpoint = getEndpointForType(params.generationType);
+    
+    try {
+        const response = await axios.post(endpoint, params, {
+            headers: {
+                'Authorization': \`Bearer \${API_KEY}\`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        // Start polling status
+        const taskId = response.data.task_id;
+        pollStatus(taskId, ws);
+        
+        return response.data;
+    } catch (error) {
+        console.error('Error generating music:', error.response?.data || error.message);
+        throw new Error(error.response?.data?.error || 'Failed to generate music');
+    }
+}
+
+async function checkStatus(taskId) {
+    try {
+        const response = await axios.get(\`\${SONAUTO_API_BASE}/generations/status/\${taskId}\`, {
+            headers: {
+                'Authorization': \`Bearer \${API_KEY}\`
+            }
+        });
+        return response.data;
+    } catch (error) {
+        console.error('Error checking status:', error.response?.data || error.message);
+        throw new Error(error.response?.data?.error || 'Failed to check status');
+    }
+}
+
+async function getResult(taskId) {
+    try {
+        const response = await axios.get(\`\${SONAUTO_API_BASE}/generations/\${taskId}\`, {
+            headers: {
+                'Authorization': \`Bearer \${API_KEY}\`
+            }
+        });
+        return response.data;
+    } catch (error) {
+        console.error('Error getting result:', error.response?.data || error.message);
+        throw new Error(error.response?.data?.error || 'Failed to get result');
+    }
+}
+
+function getEndpointForType(type) {
+    switch (type) {
+        case 'new':
+            return \`\${SONAUTO_API_BASE}/generations\`;
+        case 'extend':
+            return \`\${SONAUTO_API_BASE}/generations/extend\`;
+        case 'inpaint':
+            return \`\${SONAUTO_API_BASE}/generations/inpaint\`;
+        default:
+            return \`\${SONAUTO_API_BASE}/generations\`;
+    }
+}
+
+// Poll status and send updates to client
+async function pollStatus(taskId, ws) {
+    let interval;
+    let completed = false;
+    
+    interval = setInterval(async () => {
+        try {
+            const status = await checkStatus(taskId);
+            
+            // Send status update to client
+            ws.send(JSON.stringify({
+                type: 'status_update',
+                status: status,
+                taskId: taskId
+            }));
+            
+            // Check if generation is complete
+            if (status === 'SUCCESS' || status === 'FAILURE') {
+                completed = true;
+                clearInterval(interval);
+                
+                // If success, fetch the full result
+                if (status === 'SUCCESS') {
+                    const result = await getResult(taskId);
+                    ws.send(JSON.stringify({
+                        type: 'generation_result',
+                        result: result,
+                        taskId: taskId
+                    }));
+                }
+            }
+        } catch (error) {
+            console.error('Error polling status:', error);
+            ws.send(JSON.stringify({
+                type: 'error',
+                message: error.message,
+                taskId: taskId
+            }));
+            
+            clearInterval(interval);
+        }
+    }, 2000); // Poll every 2 seconds
+    
+    // Clear interval after 30 minutes to prevent infinite polling
+    setTimeout(() => {
+        if (!completed && interval) {
+            clearInterval(interval);
+            ws.send(JSON.stringify({
+                type: 'error',
+                message: 'Status polling timed out after 30 minutes',
+                taskId: taskId
+            }));
+        }
+    }, 30 * 60 * 1000);
+}
+
+app.listen(port, () => {
+    console.log(\`Sonauto Bridge Server running at http://localhost:\${port}\`);
+    console.log(\`WebSocket server running at ws://localhost:3334\`);
+});
+`;
+    }
+    
+    function generatePythonBridgeContent() {
+        return `
+import json
+import asyncio
+import websockets
+import requests
+import time
+from threading import Thread
+
+# Your Sonauto API key - replace with yours or use env variables
+API_KEY = "${apiKey || 'YOUR_API_KEY_HERE'}"
+SONAUTO_API_BASE = "https://api.sonauto.ai/v1"
+
+# Store active tasks for polling
+active_tasks = {}
+
+# API Functions
+def generate_music(params):
+    endpoint = get_endpoint_for_type(params.get('generationType', 'new'))
+    
+    headers = {
+        'Authorization': f'Bearer {API_KEY}',
+        'Content-Type': 'application/json'
+    }
+    
+    try:
+        response = requests.post(endpoint, json=params, headers=headers)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"Error generating music: {str(e)}")
+        if hasattr(e, 'response') and e.response:
+            error_msg = e.response.json().get('error', 'Failed to generate music')
+        else:
+            error_msg = 'Failed to generate music'
+        raise Exception(error_msg)
+
+def check_status(task_id):
+    headers = {
+        'Authorization': f'Bearer {API_KEY}'
+    }
+    
+    try:
+        response = requests.get(f"{SONAUTO_API_BASE}/generations/status/{task_id}", headers=headers)
+        response.raise_for_status()
+        return response.text.strip('"')  # API returns status as a quoted string
+    except requests.exceptions.RequestException as e:
+        print(f"Error checking status: {str(e)}")
+        if hasattr(e, 'response') and e.response:
+            error_msg = e.response.json().get('error', 'Failed to check status')
+        else:
+            error_msg = 'Failed to check status'
+        raise Exception(error_msg)
+
+def get_result(task_id):
+    headers = {
+        'Authorization': f'Bearer {API_KEY}'
+    }
+    
+    try:
+        response = requests.get(f"{SONAUTO_API_BASE}/generations/{task_id}", headers=headers)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"Error getting result: {str(e)}")
+        if hasattr(e, 'response') and e.response:
+            error_msg = e.response.json().get('error', 'Failed to get result')
+        else:
+            error_msg = 'Failed to get result'
+        raise Exception(error_msg)
+
+def get_endpoint_for_type(generation_type):
+    if generation_type == 'new':
+        return f"{SONAUTO_API_BASE}/generations"
+    elif generation_type == 'extend':
+        return f"{SONAUTO_API_BASE}/generations/extend"
+    elif generation_type == 'inpaint':
+        return f"{SONAUTO_API_BASE}/generations/inpaint"
+    else:
+        return f"{SONAUTO_API_BASE}/generations"
+
+# Poll status and send updates
+def poll_status(task_id, websocket):
+    completed = False
+    
+    while not completed:
+        try:
+            status = check_status(task_id)
+            
+            # Send status update
+            asyncio.run(send_message(websocket, {
+                'type': 'status_update',
+                'status': status,
+                'taskId': task_id
+            }))
+            
+            # Check if generation is complete
+            if status == 'SUCCESS' or status == 'FAILURE':
+                completed = True
+                
+                # If success, fetch the full result
+                if status == 'SUCCESS':
+                    result = get_result(task_id)
+                    asyncio.run(send_message(websocket, {
+                        'type': 'generation_result',
+                        'result': result,
+                        'taskId': task_id
+                    }))
+                    
+            # Wait before polling again
+            time.sleep(2)
+            
+        except Exception as e:
+            print(f"Error polling status: {str(e)}")
+            asyncio.run(send_message(websocket, {
+                'type': 'error',
+                'message': str(e),
+                'taskId': task_id
+            }))
+            completed = True
+
+async def send_message(websocket, message):
+    try:
+        await websocket.send(json.dumps(message))
+    except Exception as e:
+        print(f"Error sending message: {str(e)}")
+
+# WebSocket server handler
+async def sonauto_bridge(websocket, path):
+    print("Client connected")
+    
+    # Send connection confirmation
+    await websocket.send(json.dumps({
+        'type': 'connected',
+        'message': 'Connected to Sonauto bridge server'
+    }))
+    
+    try:
+        async for message in websocket:
+            try:
+                data = json.loads(message)
+                print(f"Received request: {data.get('action')}")
+                
+                if data.get('action') == 'generate':
+                    response = generate_music(data.get('params', {}))
+                    await websocket.send(json.dumps({
+                        'type': 'generation_started',
+                        'taskId': response.get('task_id')
+                    }))
+                    
+                    # Start status polling in a separate thread
+                    task_id = response.get('task_id')
+                    active_tasks[task_id] = Thread(target=poll_status, args=(task_id, websocket))
+                    active_tasks[task_id].start()
+                    
+                elif data.get('action') == 'status':
+                    task_id = data.get('taskId')
+                    status = check_status(task_id)
+                    await websocket.send(json.dumps({
+                        'type': 'status_update',
+                        'status': status,
+                        'taskId': task_id
+                    }))
+                    
+                elif data.get('action') == 'result':
+                    task_id = data.get('taskId')
+                    result = get_result(task_id)
+                    await websocket.send(json.dumps({
+                        'type': 'generation_result',
+                        'result': result,
+                        'taskId': task_id
+                    }))
+                    
+            except Exception as e:
+                print(f"Error processing message: {str(e)}")
+                await websocket.send(json.dumps({
+                    'type': 'error',
+                    'message': str(e)
+                }))
+                
+    except websockets.exceptions.ConnectionClosed:
+        print("Client disconnected")
+
+async def main():
+    print("Starting Sonauto Bridge Server...")
+    print("WebSocket server running at ws://localhost:3334")
+    
+    async with websockets.serve(sonauto_bridge, "localhost", 3334):
+        await asyncio.Future()  # Run forever
+
+if __name__ == "__main__":
+    asyncio.run(main())
+`;
+    }
+});
