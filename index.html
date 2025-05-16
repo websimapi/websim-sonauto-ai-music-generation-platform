@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sonauto AI - Music Generation Platform</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="app-container">
+        <header>
+            <nav class="navbar navbar-expand-lg navbar-dark">
+                <div class="container-fluid">
+                    <a class="navbar-brand" href="#">
+                        <img src="sonauto-logo.png" alt="Sonauto AI Logo" height="40">
+                        Sonauto AI
+                    </a>
+                    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                        <span class="navbar-toggler-icon"></span>
+                    </button>
+                    <div class="collapse navbar-collapse" id="navbarNav">
+                        <ul class="navbar-nav ms-auto">
+                            <li class="nav-item"><a class="nav-link active" href="#generator">Generator</a></li>
+                            <li class="nav-item"><a class="nav-link" href="#history">History</a></li>
+                            <li class="nav-item"><a class="nav-link" href="#settings">Settings</a></li>
+                            <li class="nav-item"><a class="nav-link" href="#about">About</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </nav>
+        </header>
+
+        <main>
+            <section id="welcome" class="hero-section">
+                <div class="container">
+                    <div class="row align-items-center">
+                        <div class="col-lg-6">
+                            <h1>Create Amazing Music with AI</h1>
+                            <p class="lead">Sonauto AI generates high-quality music based on your specifications. Use tags, prompts, or lyrics to create custom tracks in seconds.</p>
+                            <div class="api-key-container">
+                                <div class="input-group mb-3">
+                                    <input type="password" id="apiKeyInput" class="form-control" placeholder="Enter your Sonauto API key">
+                                    <button class="btn btn-primary" id="saveApiKey">Save Key</button>
+                                    <button class="btn btn-outline-secondary" id="toggleApiKey"><i class="fas fa-eye"></i></button>
+                                </div>
+                                <small class="form-text text-muted">Your API key is stored locally and never sent to our servers.</small>
+                            </div>
+                            <div class="mt-4">
+                                <button class="btn btn-primary btn-lg" id="getStartedBtn">Get Started</button>
+                            </div>
+                        </div>
+                        <div class="col-lg-6">
+                            <img src="hero-image.png" alt="Sonauto AI Music Generator" class="img-fluid">
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="generator" class="section-padding">
+                <div class="container">
+                    <h2 class="section-title">Music Generator</h2>
+                    
+                    <div class="connection-methods">
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h3>Connection Method</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="connection-options btn-group w-100 mb-3" role="group">
+                                    <input type="radio" class="btn-check" name="connectionMethod" id="directApi" autocomplete="off" checked>
+                                    <label class="btn btn-outline-primary" for="directApi">Direct API</label>
+                                    
+                                    <input type="radio" class="btn-check" name="connectionMethod" id="localBridge" autocomplete="off">
+                                    <label class="btn btn-outline-primary" for="localBridge">Local Bridge</label>
+                                    
+                                    <input type="radio" class="btn-check" name="connectionMethod" id="curlCommand" autocomplete="off">
+                                    <label class="btn btn-outline-primary" for="curlCommand">cURL Command</label>
+                                </div>
+                                
+                                <div id="connectionMethodDetails">
+                                    <!-- Direct API Method -->
+                                    <div class="method-detail" id="directApiDetail">
+                                        <p>Connect directly to Sonauto API from your browser. Multiple fallback methods will be attempted.</p>
+                                        <div class="connection-status">
+                                            <span class="badge bg-success">Connected</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Local Bridge Method -->
+                                    <div class="method-detail d-none" id="localBridgeDetail">
+                                        <p>Run a local bridge to connect to Sonauto API. Download one of these files and run it on your computer:</p>
+                                        <div class="d-flex gap-3">
+                                            <a href="#" id="downloadNodeBridge" class="btn btn-outline-secondary"><i class="fab fa-node-js"></i> Node.js Bridge</a>
+                                            <a href="#" id="downloadPythonBridge" class="btn btn-outline-secondary"><i class="fab fa-python"></i> Python Bridge</a>
+                                        </div>
+                                        <div class="mt-3">
+                                            <div class="connection-status">
+                                                <span class="badge bg-warning">Not Connected</span>
+                                            </div>
+                                            <div class="bridge-status"></div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- cURL Command Method -->
+                                    <div class="method-detail d-none" id="curlCommandDetail">
+                                        <p>Generate a cURL command to run in your terminal:</p>
+                                        <div class="curl-command-container">
+                                            <pre id="curlCommandText" class="bg-dark text-light p-3 rounded"></pre>
+                                            <button id="copyCurlCommand" class="btn btn-sm btn-light position-absolute top-0 end-0 m-2"><i class="fas fa-copy"></i></button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-lg-6">
+                            <div class="card mb-4">
+                                <div class="card-header d-flex justify-content-between align-items-center">
+                                    <h3>Generation Parameters</h3>
+                                    <button class="btn btn-sm btn-outline-primary" id="aiAssistant"><i class="fas fa-magic"></i> AI Assist</button>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <label for="generationType" class="form-label">Generation Type</label>
+                                        <select class="form-select" id="generationType">
+                                            <option value="new">New Song</option>
+                                            <option value="extend">Extend Existing Song</option>
+                                            <option value="inpaint">Inpaint (Replace Sections)</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <!-- New Song Parameters -->
+                                    <div id="newSongParams">
+                                        <div class="mb-3">
+                                            <label for="prompt" class="form-label">Prompt</label>
+                                            <textarea class="form-control" id="prompt" rows="2" placeholder="Describe the music you want to create..."></textarea>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label for="tags" class="form-label">Tags</label>
+                                            <div class="input-group">
+                                                <input type="text" class="form-control" id="tagInput" placeholder="Enter tags">
+                                                <button class="btn btn-outline-secondary" id="addTag">Add</button>
+                                            </div>
+                                            <div class="tag-suggestions mt-1">
+                                                <button class="badge bg-secondary tag-suggestion">rock</button>
+                                                <button class="badge bg-secondary tag-suggestion">pop</button>
+                                                <button class="badge bg-secondary tag-suggestion">jazz</button>
+                                                <button class="badge bg-secondary tag-suggestion">electronic</button>
+                                                <button class="badge bg-secondary tag-suggestion">more...</button>
+                                            </div>
+                                            <div class="selected-tags mt-2" id="selectedTags"></div>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <div class="form-check form-switch">
+                                                <input class="form-check-input" type="checkbox" id="instrumentalSwitch">
+                                                <label class="form-check-label" for="instrumentalSwitch">Instrumental (No Lyrics)</label>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="mb-3" id="lyricsContainer">
+                                            <label for="lyrics" class="form-label">Lyrics</label>
+                                            <textarea class="form-control" id="lyrics" rows="4" placeholder="Enter lyrics or let AI generate them..."></textarea>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Extend Song Parameters -->
+                                    <div id="extendSongParams" class="d-none">
+                                        <div class="mb-3">
+                                            <label for="audioUrlExtend" class="form-label">Audio URL or Upload</label>
+                                            <div class="input-group">
+                                                <input type="text" class="form-control" id="audioUrlExtend" placeholder="URL to audio file">
+                                                <button class="btn btn-outline-secondary" id="uploadAudioExtend">Upload</button>
+                                            </div>
+                                            <input type="file" id="audioFileExtend" class="d-none" accept="audio/*">
+                                            <small class="form-text text-muted">Either provide a URL or upload an audio file</small>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label for="extendSide" class="form-label">Extend Direction</label>
+                                            <select class="form-select" id="extendSide">
+                                                <option value="right">End (Right)</option>
+                                                <option value="left">Beginning (Left)</option>
+                                            </select>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label for="extendDuration" class="form-label">Extend Duration (seconds)</label>
+                                            <input type="range" class="form-range" id="extendDuration" min="1" max="85" value="30">
+                                            <div class="d-flex justify-content-between">
+                                                <span>1s</span>
+                                                <span id="extendDurationValue">30s</span>
+                                                <span>85s</span>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label for="cropDuration" class="form-label">Crop Duration (seconds)</label>
+                                            <input type="range" class="form-range" id="cropDuration" min="0" max="30" value="0">
+                                            <div class="d-flex justify-content-between">
+                                                <span>0s</span>
+                                                <span id="cropDurationValue">0s</span>
+                                                <span>30s</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Inpaint Parameters -->
+                                    <div id="inpaintSongParams" class="d-none">
+                                        <div class="mb-3">
+                                            <label for="audioUrlInpaint" class="form-label">Audio URL or Upload</label>
+                                            <div class="input-group">
+                                                <input type="text" class="form-control" id="audioUrlInpaint" placeholder="URL to audio file">
+                                                <button class="btn btn-outline-secondary" id="uploadAudioInpaint">Upload</button>
+                                            </div>
+                                            <input type="file" id="audioFileInpaint" class="d-none" accept="audio/*">
+                                            <small class="form-text text-muted">Either provide a URL or upload an audio file</small>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label class="form-label">Section to Replace (seconds)</label>
+                                            <div class="d-flex gap-2 align-items-center">
+                                                <input type="number" class="form-control" id="sectionStart" placeholder="Start" min="0" value="0">
+                                                <span>to</span>
+                                                <input type="number" class="form-control" id="sectionEnd" placeholder="End" min="0" value="30">
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <div class="form-check form-switch">
+                                                <input class="form-check-input" type="checkbox" id="selectionCrop">
+                                                <label class="form-check-label" for="selectionCrop">Crop to Replaced Section</label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Advanced Parameters -->
+                                    <div class="card mb-3">
+                                        <div class="card-header" data-bs-toggle="collapse" data-bs-target="#advancedParams" role="button">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <span>Advanced Parameters</span>
+                                                <i class="fas fa-chevron-down"></i>
+                                            </div>
+                                        </div>
+                                        <div class="collapse" id="advancedParams">
+                                            <div class="card-body">
+                                                <div class="mb-3">
+                                                    <label for="promptStrength" class="form-label">Prompt Strength: <span id="promptStrengthValue">2.3</span></label>
+                                                    <input type="range" class="form-range" id="promptStrength" min="0.1" max="5" step="0.1" value="2.3">
+                                                    <small class="form-text text-muted">Higher values result in less natural vocals but fewer hallucinations.</small>
+                                                </div>
+                                                
+                                                <div class="mb-3">
+                                                    <label for="seed" class="form-label">Seed</label>
+                                                    <div class="input-group">
+                                                        <input type="number" class="form-control" id="seed" placeholder="Random seed">
+                                                        <button class="btn btn-outline-secondary" id="randomSeed">Random</button>
+                                                    </div>
+                                                    <small class="form-text text-muted">Same seed with same inputs will generate the same song.</small>
+                                                </div>
+                                                
+                                                <div class="mb-3">
+                                                    <label for="numSongs" class="form-label">Number of Songs</label>
+                                                    <select class="form-select" id="numSongs">
+                                                        <option value="1">1 Song (100 credits)</option>
+                                                        <option value="2">2 Songs (150 credits)</option>
+                                                    </select>
+                                                </div>
+                                                
+                                                <div class="mb-3">
+                                                    <label for="outputFormat" class="form-label">Output Format</label>
+                                                    <select class="form-select" id="outputFormat">
+                                                        <option value="ogg">OGG (Opus) - Default</option>
+                                                        <option value="mp3">MP3</option>
+                                                        <option value="flac">FLAC</option>
+                                                        <option value="wav">WAV</option>
+                                                        <option value="m4a">M4A (AAC)</option>
+                                                    </select>
+                                                </div>
+                                                
+                                                <div class="mb-3" id="bitRateContainer">
+                                                    <label for="outputBitRate" class="form-label">Bit Rate (kbps)</label>
+                                                    <select class="form-select" id="outputBitRate">
+                                                        <option value="128">128 kbps</option>
+                                                        <option value="192">192 kbps</option>
+                                                        <option value="256">256 kbps</option>
+                                                        <option value="320" selected>320 kbps</option>
+                                                    </select>
+                                                </div>
+                                                
+                                                <div class="mb-3">
+                                                    <label for="webhookUrl" class="form-label">Webhook URL (Optional)</label>
+                                                    <input type="text" class="form-control" id="webhookUrl" placeholder="https://your-server.com/webhook">
+                                                    <small class="form-text text-muted">Receive real-time updates about your generation.</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="d-grid">
+                                        <button class="btn btn-primary btn-lg" id="generateButton">Generate Music</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-lg-6">
+                            <div class="card mb-4">
+                                <div class="card-header">
+                                    <h3>Results</h3>
+                                </div>
+                                <div class="card-body">
+                                    <div id="generationStatus" class="alert alert-info d-none">
+                                        <div class="d-flex align-items-center">
+                                            <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                                            <div>
+                                                <strong>Status: <span id="statusText">Waiting to start...</span></strong>
+                                                <div class="progress mt-2">
+                                                    <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" style="width: 0%"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div id="results" class="d-none">
+                                        <div id="songContainer"></div>
+                                        
+                                        <div class="mt-3 d-flex gap-2">
+                                            <button class="btn btn-success" id="downloadSong"><i class="fas fa-download"></i> Download</button>
+                                            <button class="btn btn-outline-primary" id="shareButton"><i class="fas fa-share-alt"></i> Share</button>
+                                            <button class="btn btn-outline-secondary" id="copyTaskId"><i class="fas fa-clipboard"></i> Copy Task ID</button>
+                                        </div>
+                                        
+                                        <div class="mt-4">
+                                            <div class="card">
+                                                <div class="card-header">Generated Details</div>
+                                                <div class="card-body">
+                                                    <div class="mb-3">
+                                                        <h5>Tags</h5>
+                                                        <div id="resultTags" class="mb-3"></div>
+                                                    </div>
+                                                    
+                                                    <div class="mb-3" id="resultLyricsContainer">
+                                                        <h5>Lyrics</h5>
+                                                        <pre id="resultLyrics" class="bg-light p-3 rounded"></pre>
+                                                    </div>
+                                                    
+                                                    <div class="mb-3">
+                                                        <h5>Generation Details</h5>
+                                                        <table class="table table-sm">
+                                                            <tbody>
+                                                                <tr>
+                                                                    <th>Task ID</th>
+                                                                    <td id="resultTaskId"></td>
+                                                                </tr>
+                                                                <tr>
+                                                                    <th>Created</th>
+                                                                    <td id="resultCreatedAt"></td>
+                                                                </tr>
+                                                                <tr>
+                                                                    <th>Seed</th>
+                                                                    <td id="resultSeed"></td>
+                                                                </tr>
+                                                                <tr>
+                                                                    <th>Prompt Strength</th>
+                                                                    <td id="resultPromptStrength"></td>
+                                                                </tr>
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div id="noResults" class="text-center p-5">
+                                        <i class="fas fa-music fa-3x mb-3 text-muted"></i>
+                                        <h4>No generations yet</h4>
+                                        <p>Fill in the parameters and click Generate to create music.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+            <section id="history" class="section-padding">
+                <div class="container">
+                    <h2 class="section-title">Generation History</h2>
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-hover" id="historyTable">
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Date</th>
+                                            <th>Tags</th>
+                                            <th>Status</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <!-- History entries will be added dynamically -->
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div id="emptyHistory" class="text-center p-4">
+                                <i class="fas fa-history fa-3x mb-3 text-muted"></i>
+                                <h4>No generation history</h4>
+                                <p>Your recent generations will appear here.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+            <section id="about" class="section-padding bg-light">
+                <div class="container">
+                    <h2 class="section-title">About Sonauto AI</h2>
+                    <div class="row">
+                        <div class="col-lg-6">
+                            <h3>What is Sonauto AI?</h3>
+                            <p>Sonauto AI is a powerful music generation platform that leverages artificial intelligence to create high-quality, custom music based on your specifications. Whether you need music for videos, games, podcasts, or personal enjoyment, Sonauto AI can generate original tracks in seconds.</p>
+                            
+                            <h3>How It Works</h3>
+                            <p>Our AI has been trained on thousands of songs across various genres. You can guide the generation process by providing tags, lyrics, or plain text prompts describing the music you want. The AI will then create a unique track based on your input.</p>
+                            
+                            <h3>API Credits</h3>
+                            <p>One 1 minute 35 second song costs 100 credits. Generating 2 songs in one request costs 150 credits. Visit the <a href="https://sonauto.ai" target="_blank">Sonauto website</a> for more information about pricing plans.</p>
+                        </div>
+                        <div class="col-lg-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3>Features</h3>
+                                </div>
+                                <div class="card-body">
+                                    <ul class="feature-list">
+                                        <li><i class="fas fa-check-circle text-success"></i> Generate original music in seconds</li>
+                                        <li><i class="fas fa-check-circle text-success"></i> Multiple connection methods (Direct API, Local Bridge, cURL)</li>
+                                        <li><i class="fas fa-check-circle text-success"></i> AI assistance for crafting prompts and lyrics</li>
+                                        <li><i class="fas fa-check-circle text-success"></i> Extend existing songs</li>
+                                        <li><i class="fas fa-check-circle text-success"></i> Replace sections of audio (inpainting)</li>
+                                        <li><i class="fas fa-check-circle text-success"></i> Generate instrumental or vocal tracks</li>
+                                        <li><i class="fas fa-check-circle text-success"></i> Multiple output formats (OGG, MP3, FLAC, WAV, M4A)</li>
+                                        <li><i class="fas fa-check-circle text-success"></i> Advanced customization options</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer class="footer">
+            <div class="container">
+                <div class="row">
+                    <div class="col-md-4">
+                        <h4>Sonauto AI</h4>
+                        <p>AI-powered music generation platform</p>
+                    </div>
+                    <div class="col-md-4">
+                        <h4>Links</h4>
+                        <ul class="list-unstyled">
+                            <li><a href="https://sonauto.ai" target="_blank">Official Website</a></li>
+                            <li><a href="https://sonauto.ai/api" target="_blank">API Documentation</a></li>
+                            <li><a href="https://sonauto.ai/pricing" target="_blank">Pricing</a></li>
+                        </ul>
+                    </div>
+                    <div class="col-md-4">
+                        <h4>Connect</h4>
+                        <div class="social-icons">
+                            <a href="#" class="social-icon"><i class="fab fa-twitter"></i></a>
+                            <a href="#" class="social-icon"><i class="fab fa-github"></i></a>
+                            <a href="#" class="social-icon"><i class="fab fa-discord"></i></a>
+                        </div>
+                    </div>
+                </div>
+                <hr>
+                <div class="text-center">
+                    <p>&copy; 2023 Sonauto AI. All rights reserved.</p>
+                </div>
+            </div>
+        </footer>
+
+        <!-- AI Assistant Modal -->
+        <div class="modal fade" id="aiAssistantModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">AI Assistant</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="ai-chat-container">
+                            <div class="chat-messages" id="aiChatMessages">
+                                <div class="message ai-message">
+                                    <div class="message-content">
+                                        <p>Hello! I'm your AI assistant for Sonauto. I can help you craft prompts, suggest tags, or generate lyrics. What would you like help with today?</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="chat-input">
+                                <div class="input-group">
+                                    <input type="text" id="aiChatInput" class="form-control" placeholder="Type your question...">
+                                    <button class="btn btn-primary" id="aiChatSend">Send</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/wavesurfer.js@6.6.3/dist/wavesurfer.min.js"></script>
+    <script src="script.js"></script>
+    <script src="ai-assistant.js"></script>
+    <script src="api-bridge.js"></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4c6229722a6346bc8eb5cb0e5eae5d41","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+</body>
+</html>
+
